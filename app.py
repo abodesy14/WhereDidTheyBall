@@ -96,7 +96,7 @@ st.markdown(
 )
 
 st.title("Where Did They Ball?")
-st.caption("Test your ball knowledge by guessing where athletes played in college")
+st.caption("Test your ball knowledge by guessing where athletes played in college. On mobile, click >> in the top left to filter.")
 
 players = load_all_players()
 
