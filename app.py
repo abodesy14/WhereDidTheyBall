@@ -80,7 +80,7 @@ def pick_player(filtered):
 
 
 
-st.set_page_config(page_title="Collegele", layout="centered")
+st.set_page_config(page_title="Where Did They Ball?", layout="centered")
 
 # reduce whitespace at top of app
 st.markdown(
@@ -95,7 +95,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-st.title("Collegele")
+st.title("Where Did They Ball?")
 st.caption("Test your ball knowledge by guessing where athletes played in college.")
 
 players = load_all_players()
