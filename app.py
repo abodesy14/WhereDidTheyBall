@@ -82,6 +82,14 @@ def pick_player(filtered):
 
 st.set_page_config(page_title="Where Did They Ball?", layout="centered")
 
+# google verification tag
+st.markdown(
+    """
+    <meta name="google-site-verification" content="google5b400ac1fce5c360" />
+    """,
+    unsafe_allow_html=True
+)
+
 # reduce whitespace at top of app
 st.markdown(
     """
