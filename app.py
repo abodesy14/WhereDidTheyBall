@@ -96,7 +96,7 @@ st.markdown(
 )
 
 st.title("Where Did They Ball?")
-st.caption("Test your ball knowledge by guessing where athletes played in college.")
+st.caption("Test your ball knowledge by guessing where athletes played in college")
 
 players = load_all_players()
 
@@ -121,14 +121,10 @@ with st.sidebar:
     # put a placeholder here so we can fill it after
     pos_placeholder = st.empty()
 
-    status_choice = st.radio("Player Status", options=["Active", "All Players"], index=0)
-
     # compute position options after knowing status_choice filter
     filtered_players = players.copy()
 
     # print number of players in active status group in parenthesis after position
-    if status_choice == "Active":
-        filtered_players = filtered_players[filtered_players["active"].astype(str).str.upper() == "TRUE"]
     if sport_choice == "all":
         pos_counts = filtered_players["position"].dropna().value_counts()
     else:
@@ -147,6 +143,40 @@ with st.sidebar:
         pos_choice_clean = ""
     else:
         pos_choice_clean = pos_choice.split(" (")[0]
+
+
+    # team filter - should depend on sport and status
+    team_placeholder = st.empty()
+
+    if sport_choice == "all":
+        teams = filtered_players["team"].dropna().unique()
+    else:
+        teams = (
+            filtered_players.loc[filtered_players["league"] == sport_choice, "team"]
+            .dropna()
+            .unique()
+        )
+
+    teams = sorted(teams)
+
+    # persist across other filtrations if valid
+    if "team_choice" not in st.session_state:
+        st.session_state.team_choice = "All"
+
+    # reset to all if selection isn't valid anymore 
+    # ex: you're filtered to CHW which is an MLB team, and then select NFL as a filter
+    if st.session_state.team_choice not in (["All"] + list(teams)):
+        st.session_state.team_choice = "All"
+
+    team_choice = team_placeholder.selectbox(
+        "Team",
+        options=["All"] + list(teams),
+        index=(["All"] + list(teams)).index(st.session_state.team_choice),
+        key="team_choice",
+    )
+
+
+    status_choice = st.radio("Player Status", options=["Active", "All Players"], index=0)
 
     st.markdown(
     "> ⚠️ **Note:** Data comes from ESPN and may not include full transfer history. Usually only the most recent college is available.")
@@ -168,6 +198,7 @@ filter_state = {
     "sport": sport_choice,
     "position": pos_choice_clean,
     "active": status_choice,
+    "team": st.session_state.get("team_choice", "All"),
 }
 
 if "last_filters" not in st.session_state:
@@ -185,13 +216,23 @@ init_session(players)
 
 # compute available pool according to sidebar filters
 pool = st.session_state.players_pool
+
+# filter by sport
 if sport_choice != "all":
     pool = pool[pool["league"] == sport_choice]
+
+# filter by position
 if pos_choice_clean:
     pool = pool[pool["position"].fillna("").str.upper() == pos_choice_clean.strip().upper()]
+
+# apply team filter from session state
+team_choice = st.session_state.get("team_choice", "All")
+if team_choice != "All":
+    pool = pool[pool["team"].fillna("") == team_choice]
+
+# filter by active status
 if status_choice == "Active":
     pool = pool[pool["active"] == True]
-
 
 # show remaining count
 st.write(f"Players matching current filters: **{len(pool):,}**")
