@@ -85,7 +85,7 @@ st.set_page_config(page_title="Where Did They Ball?", layout="centered")
 # google verification tag
 st.markdown(
     """
-    <meta name="google-site-verification" content="google5b400ac1fce5c360" />
+    <meta name="google-site-verification" content="C3GMCyr_wr5SpmshMagKtfOh1ltJX9abRX9C3F-ze2I" />
     """,
     unsafe_allow_html=True
 )
