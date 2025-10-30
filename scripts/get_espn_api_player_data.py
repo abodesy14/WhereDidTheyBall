@@ -5,7 +5,7 @@ from datetime import datetime
 import pandas as pd
 from pathlib import Path
 
-# scrape one league at a time
+# set sport to scrape. only allows for one at a time with current setup
 sport = 'football'
 
 sport_map = {
@@ -28,7 +28,7 @@ script_directory = Path(__file__).resolve().parent
 data_directory = script_directory.parent / "data" / "espn"
 output_csv = data_directory / f"{league}_espn_api_players.csv"
 
-# cache to avoid redundant calls
+# cache to speed things up
 college_cache = {}
 team_cache = {}
 
@@ -54,8 +54,9 @@ def get_college_info(col_ref):
     college_cache[col_ref] = (None, None)
     return (None, None)
 
-def get_colleges(v2_data):
     # try collegeAthlete first as that looks to be more reliable
+
+def get_colleges(v2_data):
     ca_ref = (v2_data.get("collegeAthlete") or {}).get("$ref")
     if ca_ref:
         ca_data = get_json(ca_ref)
@@ -100,7 +101,7 @@ def get_position(v2_data):
 # get current timestamp each time we run this
 processed_ts = datetime.now().isoformat()
 
-# return all players with pagination
+# handle pagination. currently 2 pages to loop through
 all_athletes = []
 page = 1
 
@@ -109,7 +110,7 @@ while True:
     v3_json = get_json(url)
     
     if not v3_json:
-        print(f"Failed to fetch page {page}")
+        print(f"Failed to get page {page}")
         break
     
     items = v3_json.get("items", [])
@@ -117,7 +118,7 @@ while True:
         break
     
     all_athletes.extend(items)
-    print(f"  Got {len(items)} athletes from page {page} (Total: {len(all_athletes)})")
+    print(f"  Retrieved {len(items)} player from page {page} (Total: {len(all_athletes)})")
     
     # check if there are more pages to scrape
     page_count = v3_json.get("pageCount", 1)
@@ -127,12 +128,32 @@ while True:
     page += 1
     sleep(0.5)
 
-print(f"\nTotal athletes fetched: {len(all_athletes)}")
+print(f"\nTotal athletes retrieved: {len(all_athletes)}")
 
 # exclude specific IDs. bad/irrelevant data
 exclude_ids = {"4246273", "4246281", "4246289", "4246247", "4246272", "4246274"}
 athletes = [a for a in all_athletes if str(a.get("id")) not in exclude_ids]
 
+# find which players we've already scraped to speed up process
+# old data may become stagnant, but only for fields dynamically changing such as age, experience, etc. 
+# we can take those dependencies out of app so once we pull it once we only need to process new records
+# other data is set in stone such as draft year, college, name, etc.
+if output_csv.exists():
+    existing_df = pd.read_csv(output_csv)
+    existing_ids = set(existing_df['id'].astype(str).unique())
+    print(f"\nFound {len(existing_ids)} existing espn IDs in database")
+    
+    # filter to only new players we don't already have record of
+    athletes_before = len(athletes)
+    athletes = [a for a in athletes if str(a.get("id")) not in existing_ids]
+    print(f"Filtered out {athletes_before - len(athletes)} existing players")
+    print(f"Processing {len(athletes)} new players")
+    
+    if len(athletes) == 0:
+        print("\nNo new players to process")
+        exit(0)
+else:
+    print("\nNo existing data found so processing all players")
 
 results = []
 start_time = time()
@@ -181,11 +202,12 @@ for i, athlete in enumerate(athletes):
     results.append(row)
     
     # progress tracker
+    # print out estimated time remaining
     if (i + 1) % 10 == 0:
         elapsed = time() - start_time
         rate = (i + 1) / elapsed
         remaining = (len(athletes) - (i + 1)) / rate
-        print(f"Processed {i + 1}/{len(athletes)} - {rate:.1f}/sec - Est. {remaining/60:.1f} min remaining")
+        print(f"Processed {i + 1}/{len(athletes)} - {rate:.1f}/sec - Estimated. {remaining/60:.1f} mins remaining")
     
     # sleep between api requests
     sleep(0.05)
@@ -193,10 +215,10 @@ for i, athlete in enumerate(athletes):
 # load existing data if file exists
 if output_csv.exists():
     existing_df = pd.read_csv(output_csv)
-    print(f"Loaded {len(existing_df)} existing records")
+    print(f"\nLoading {len(existing_df)} existing records to append new data")
 else:
     existing_df = pd.DataFrame()
-    print("No existing file found, creating new dataset")
+    print("\nNo existing file found so creating a new dataset")
 
 new_df = pd.DataFrame(results)
 
@@ -221,8 +243,9 @@ mask = ~combined_df.duplicated(subset=['id'], keep='first')
 combined_df.loc[mask, 'is_latest'] = 1
 combined_df.to_csv(output_csv, index=False)
 
+# summary statistics of last pull
 elapsed = time() - start_time
-print(f"\nDone! Processed {len(new_df)} players in {elapsed/60:.1f} minutes")
+print(f"\nDone, processed {len(new_df)} players in {elapsed/60:.1f} minutes")
 print(f"Total records: {len(combined_df)}")
 print(f"Latest records: {len(combined_df[combined_df['is_latest'] == 1])}")
 print(f"Historical records: {len(combined_df[combined_df['is_latest'] == 0])}")
