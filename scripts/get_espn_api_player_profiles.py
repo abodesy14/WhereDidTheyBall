@@ -6,7 +6,7 @@ import pandas as pd
 from pathlib import Path
 
 # set sport to scrape. only allows for one at a time with current setup
-sport = 'football'
+sport = 'basketball'
 
 sport_map = {
     'football': 'nfl',
@@ -25,8 +25,8 @@ v3_list_url = f"https://sports.core.api.espn.com/v3/sports/{sport}/{league}/athl
 v2_ath_url = f"https://sports.core.api.espn.com/v2/sports/{sport}/leagues/{league}/athletes/{{}}"
 
 script_directory = Path(__file__).resolve().parent
-data_directory = script_directory.parent / "data" / "espn"
-output_csv = data_directory / f"{league}_espn_api_players.csv"
+data_directory = script_directory.parent / "data" / "espn" / "player_profiles"
+output_csv = data_directory / f"{league}_espn_api_player_profiles.csv"
 
 # cache to speed things up
 college_cache = {}
@@ -118,7 +118,7 @@ while True:
         break
     
     all_athletes.extend(items)
-    print(f"  Retrieved {len(items)} player from page {page} (Total: {len(all_athletes)})")
+    print(f"  Retrieved {len(items)} players from page {page} (Total: {len(all_athletes)})")
     
     # check if there are more pages to scrape
     page_count = v3_json.get("pageCount", 1)
@@ -140,20 +140,19 @@ athletes = [a for a in all_athletes if str(a.get("id")) not in exclude_ids]
 # other data is set in stone such as draft year, college, name, etc.
 if output_csv.exists():
     existing_df = pd.read_csv(output_csv)
-    existing_ids = set(existing_df['id'].astype(str).unique())
-    print(f"\nFound {len(existing_ids)} existing espn IDs in database")
+    existing_ids = set(existing_df['uuid'].astype(str).unique())
+    print(f"\nFound {len(existing_ids)} existing ESPN UUIDs in database")
     
-    # filter to only new players we don't already have record of
     athletes_before = len(athletes)
-    athletes = [a for a in athletes if str(a.get("id")) not in existing_ids]
+    athletes = [a for a in athletes if f"{a.get('id')}_{league}" not in existing_ids]
     print(f"Filtered out {athletes_before - len(athletes)} existing players")
     print(f"Processing {len(athletes)} new players")
     
     if len(athletes) == 0:
-        print("\nNo new players to process")
+        print("No new players to process")
         exit(0)
 else:
-    print("\nNo existing data found so processing all players")
+    print("No existing data found so processing all players")
 
 results = []
 start_time = time()
@@ -171,6 +170,7 @@ for i, athlete in enumerate(athletes):
     college, college_id, college_source = get_colleges(v2_data) if v2_data else ("", None, None)
     
     row = {
+        "uuid": f"{aid}_{league}",
         "id": aid,
         "league": league,
         "fullName": athlete.get("fullName"),
@@ -215,10 +215,10 @@ for i, athlete in enumerate(athletes):
 # load existing data if file exists
 if output_csv.exists():
     existing_df = pd.read_csv(output_csv)
-    print(f"\nLoading {len(existing_df)} existing records to append new data")
+    print(f"Loading {len(existing_df)} existing records to append new data")
 else:
     existing_df = pd.DataFrame()
-    print("\nNo existing file found so creating a new dataset")
+    print("No existing file found so creating a new dataset")
 
 new_df = pd.DataFrame(results)
 
@@ -239,7 +239,7 @@ combined_df = combined_df.sort_values('processed_ts', ascending=False)
 
 # SCD table - mark is_latest 1 for most recent record per id, 0 for all others
 combined_df['is_latest'] = 0
-mask = ~combined_df.duplicated(subset=['id'], keep='first')
+mask = ~combined_df.duplicated(subset=['uuid'], keep='first')
 combined_df.loc[mask, 'is_latest'] = 1
 combined_df.to_csv(output_csv, index=False)
 
@@ -252,7 +252,7 @@ print(f"Historical records: {len(combined_df[combined_df['is_latest'] == 0])}")
 
 # show college source breakdown for latest records
 latest = combined_df[combined_df['is_latest'] == 1]
-print(f"\nCollege source breakdown (latest records):")
+print(f"College source breakdown (latest records):")
 print(f"From collegeAthlete: {len(latest[latest['college_source'] == 'collegeAthlete'])}")
 print(f"From direct: {len(latest[latest['college_source'] == 'direct'])}")
 print(f"No college found: {len(latest[latest['college_source'].isna()])}")
