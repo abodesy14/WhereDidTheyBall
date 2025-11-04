@@ -4,7 +4,7 @@ import requests
 from pathlib import Path
 
 data_directory = Path(__file__).resolve().parent / "data" / "app_data"
-player_data = data_directory / "player_college_data.csv"
+player_data = data_directory / "player_profile_data.csv"
 accepted_answers = pd.read_csv("data/manual/accepted_answers.csv")
 
 # accepted answer aliases
@@ -32,11 +32,9 @@ alias_lookup = {
 }
 
 @st.cache_data
-
-
 def load_all_players():
     df = pd.read_csv(player_data)
-    df["id"] = df["id"].astype(str)
+    df["uuid"] = df["uuid"].astype(str)
     return df
 
 
@@ -357,9 +355,9 @@ if st.session_state.current is not None:
                 st.session_state.last_result = ("incorrect", correct_display)
 
             # drop current player so they won't be asked again during session
-            pid = st.session_state.current["id"]
+            pid = st.session_state.current["uuid"]
             st.session_state.players_pool = st.session_state.players_pool[
-                st.session_state.players_pool["id"] != pid
+                st.session_state.players_pool["uuid"] != pid
             ]
 
             # mark player as answered
